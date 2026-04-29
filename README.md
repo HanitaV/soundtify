@@ -35,6 +35,21 @@ Bạn có thể chạy dự án theo 2 cách:
    python main.py --classic
    ```
 
+## 📦 Tự động build & release
+
+Repository đã có GitHub Actions tại `.github/workflows/release.yml` để tự động kiểm tra mã nguồn, compile bằng PyInstaller và đóng gói file `soundtify.exe`.
+
+*   Khi push lên `main`/`master` hoặc mở Pull Request: workflow sẽ cài dependencies, chạy `compileall`, build `.exe` và upload artifact.
+*   Khi push tag dạng `v*` như `v1.0.0`: workflow sẽ tạo GitHub Release và đính kèm file `soundtify-windows-x64.zip`.
+*   Có thể chạy thủ công trong tab **Actions** bằng `workflow_dispatch`; nhập version/tag như `v1.0.0` nếu muốn publish release.
+
+Tạo release mới bằng tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
 ## 🎮 Cách sử dụng lệnh (Commands)
 
 Khi ứng dụng chạy, mặc định bạn sẽ thấy giao diện Home kiểu SoundCloud tối giản:
