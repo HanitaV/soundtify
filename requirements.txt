@@ -1,0 +1,8 @@
+yt-dlp
+ytmusicapi
+spotipy
+requests
+rich
+prompt_toolkit
+textual
+pyinstaller
