@@ -8,6 +8,10 @@
 ### Classic CLI
 
 ![Soundtify CLI preview](docs/assets/CLI.png)
+
+### Ram usage
+
+![Ram usage](docs/assets/RAM.png)
 <!-- CLI_CAPTURE_END -->
 
 # 🎵 Soundtify CLI
