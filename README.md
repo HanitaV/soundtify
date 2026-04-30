@@ -3,11 +3,11 @@
 
 ### TUI Home
 
-![Soundtify TUI preview](docs/assets/tui-preview.svg)
+![Soundtify TUI preview](docs/assets/TUI.png)
 
 ### Classic CLI
 
-![Soundtify CLI preview](docs/assets/cli-preview.svg)
+![Soundtify CLI preview](docs/assets/CLI.png)
 <!-- CLI_CAPTURE_END -->
 
 # 🎵 Soundtify CLI
