@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Soundtify Cookie Helper",
+  "version": "1.0.0",
+  "description": "Copy YouTube Music cookies for local Soundtify login.",
+  "permissions": [
+    "cookies",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://music.youtube.com/*",
+    "https://www.youtube.com/*",
+    "https://youtube.com/*",
+    "https://accounts.google.com/*"
+  ],
+  "action": {
+    "default_title": "Soundtify Cookie Helper",
+    "default_popup": "popup.html"
+  }
+}

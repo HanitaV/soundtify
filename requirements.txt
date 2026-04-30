@@ -6,3 +6,6 @@ rich
 prompt_toolkit
 textual
 pyinstaller
+pypresence
+winrt-Windows.Media
+winrt-Windows.Media.Playback

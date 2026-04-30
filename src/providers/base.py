@@ -29,6 +29,15 @@ class Track:
             source=str(data.get("source", "Unknown")),
         )
 
+
+@dataclass(slots=True)
+class LyricLine:
+    text: str
+    start_seconds: int | None = None
+    end_seconds: int | None = None
+    source: str = ""
+
+
 class BaseProvider(ABC):
     @abstractmethod
     def search(self, query: str) -> list[Track]:
@@ -37,6 +46,9 @@ class BaseProvider(ABC):
     @abstractmethod
     def get_stream_url(self, track_id: str) -> str:
         pass
+
+    def recommendations_for(self, track: Track, limit: int = 20) -> list[Track]:
+        return []
 
 
 def format_duration(seconds) -> str:
@@ -83,3 +95,24 @@ def extract_stream_url(info: dict) -> str:
             return url
 
     return ""
+
+
+def extract_stream_headers(info: dict, stream_url: str = "") -> dict[str, str]:
+    if not isinstance(info, dict):
+        return {}
+
+    candidates = [info]
+    candidates.extend(item for item in info.get("requested_downloads") or [] if isinstance(item, dict))
+    candidates.extend(item for item in info.get("formats") or [] if isinstance(item, dict))
+
+    for item in candidates:
+        if stream_url and item.get("url") not in (None, stream_url):
+            continue
+        headers = item.get("http_headers")
+        if isinstance(headers, dict) and headers:
+            return {str(key): str(value) for key, value in headers.items() if value}
+
+    headers = info.get("http_headers")
+    if isinstance(headers, dict):
+        return {str(key): str(value) for key, value in headers.items() if value}
+    return {}

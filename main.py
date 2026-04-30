@@ -14,7 +14,7 @@ def main():
         try:
             app.run()
         finally:
-            app.player.stop()
+            app.shutdown_audio()
         return
 
     app = SoundtifyTUI()

@@ -10,10 +10,14 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from src.core import debug_log
 from src.core.accounts import AccountManager, SUPPORTED_PLATFORMS
 from src.core.library import LibraryManager
 from src.core.player import Player
+from src.core.presence import PresenceManager
 from src.core.security import secure_load_json, secure_save_json
+from src.core.soundcloud_auth import extract_soundcloud_token
+from src.core.ytmusic_auth import extract_cookie_from_input
 from src.providers import SoundCloudProvider, SpotifyProvider, YTMusicProvider
 from src.providers.base import Track, format_duration, parse_duration
 
@@ -38,9 +42,14 @@ class SoundtifyApp:
         self.session = None
         self.library = LibraryManager()
         self.accounts = AccountManager()
+        self.presence = PresenceManager()
         self.search_cache = secure_load_json(CACHE_FILE)
         if not isinstance(self.search_cache, dict):
             self.search_cache = {}
+
+    def shutdown_audio(self) -> None:
+        self.player.stop()
+        self.presence.close()
 
     def _prompt(self, message: str, completer=None) -> str:
         try:
@@ -103,7 +112,7 @@ class SoundtifyApp:
     def _account_panel(self) -> Panel:
         accounts = self.accounts.connected_platforms()
         if not accounts:
-            body = "Chưa đăng nhập.\n[dim]login <platform> <label>[/dim]"
+            body = "Chưa đăng nhập.\n[dim]login ytmusic <Cookie header>[/dim]"
         else:
             lines = []
             for platform, account in accounts.items():
@@ -222,11 +231,13 @@ class SoundtifyApp:
                 raise RuntimeError("Provider không trả về URL âm thanh.")
 
             duration_seconds = parse_duration(track.duration)
-            if self.player.play(url, start_seconds, duration_seconds):
+            headers = getattr(provider, "last_stream_headers", {})
+            if self.player.play(url, start_seconds, duration_seconds, headers):
                 self.current_track = track
                 self.provider_name = provider_name
                 self.current_provider = provider
                 self.library.add_to_history(track)
+                self.update_presence_for_current(playing=True)
                 console.print(f"[bold green]▶ Đang phát: {track.title} - {track.artist}[/bold green]")
                 console.print("[dim]Lệnh nhanh: seek +30, seek -15, next, back, now, stop[/dim]")
         except Exception as e:
@@ -281,9 +292,31 @@ class SoundtifyApp:
             success = self.player.seek_to(target)
 
         if success:
+            self.update_presence_for_current(playing=self.player.is_playing())
             console.print(f"[green]Đã tua tới {format_duration(self.player.elapsed_seconds())}.[/green]")
         else:
             console.print("[red]Không tua được bài hiện tại.[/red]")
+
+    def update_presence_for_current(self, playing: bool) -> None:
+        if not self.current_track:
+            self.presence.clear()
+            return
+        elapsed = self.player.elapsed_seconds()
+        duration = parse_duration(self.current_track.duration)
+        self.presence.set_track(
+            self.current_track,
+            self.provider_name,
+            elapsed,
+            duration,
+            self._share_url_for(self.current_track),
+            playing,
+        )
+
+    def _share_url_for(self, track: Track) -> str:
+        source = track.source.lower()
+        if "soundcloud" in source and track.id.startswith("http"):
+            return track.id
+        return f"https://music.youtube.com/watch?v={track.id}"
 
     def suggest(self, query: str = ""):
         if query.strip():
@@ -335,7 +368,7 @@ class SoundtifyApp:
     def show_accounts(self):
         accounts = self.accounts.connected_platforms()
         if not accounts:
-            console.print("[yellow]Chưa có tài khoản nào. Dùng: login <ytmusic|soundcloud|spotify> <label> [token][/yellow]")
+            console.print("[yellow]Chưa có tài khoản nào. Dùng: login ytmusic <Cookie header> hoặc login <soundcloud|spotify> <label> [token][/yellow]")
             return
 
         table = Table(show_header=True, header_style="bold magenta", box=box.SIMPLE)
@@ -378,7 +411,8 @@ class SoundtifyApp:
             ("seek/tua <+giây|-giây|m:ss>", "Tua bài hiện tại"),
             ("next/n, back/b, stop", "Điều khiển phát nhạc"),
             ("provider <ytmusic|soundcloud|spotify>", "Đổi nguồn tìm kiếm"),
-            ("login <platform> <label> [token]", "Lưu trạng thái đăng nhập local"),
+            ("login ytmusic <Cookie header>", "Lưu cookie YouTube Music kiểu Metrolist"),
+            ("login <soundcloud|spotify> <label> [token]", "Lưu trạng thái đăng nhập local"),
             ("logout <platform>, accounts, sync", "Quản tài khoản và đồng bộ local"),
         ]
         for command, desc in commands:
@@ -418,18 +452,71 @@ class SoundtifyApp:
     def handle_login_command(self, args: str):
         parts = args.split()
         if not parts:
-            console.print(f"[red]Ví dụ: login ytmusic Nelovo. Hỗ trợ: {', '.join(sorted(SUPPORTED_PLATFORMS))}[/red]")
+            console.print(f"[red]Ví dụ: login ytmusic Cookie: SAPISID=...; ... Hỗ trợ: {', '.join(sorted(SUPPORTED_PLATFORMS))}[/red]")
             return
 
         platform = parts[0]
+        debug_log.info("Classic login command", platform=platform, args_length=str(len(args)))
+        if platform == "ytmusic":
+            cookie = extract_cookie_from_input(args.partition(" ")[2])
+            if not cookie:
+                console.print("[cyan]Đang thử lấy cookie YouTube Music từ Edge/Chrome/Brave/Firefox...[/cyan]")
+                try:
+                    account = self.accounts.login_ytmusic_browser_cookie()
+                    provider = self.providers.get("ytmusic")
+                    if hasattr(provider, "refresh_auth"):
+                        provider.refresh_auth()
+                    console.print(f"[green]Đã lấy cookie YouTube Music từ {account.get('browser', 'browser')}.[/green]")
+                except Exception as exc:
+                    debug_log.exception("Classic ytmusic browser login failed", error=str(exc))
+                    console.print(f"[red]Không tự lấy được cookie: {exc}[/red]")
+                    console.print("[yellow]Dán Cookie header của https://music.youtube.com sau lệnh login ytmusic.[/yellow]")
+                return
+            try:
+                self.accounts.login_ytmusic_cookie(cookie)
+                provider = self.providers.get("ytmusic")
+                if hasattr(provider, "refresh_auth"):
+                    provider.refresh_auth()
+                console.print("[green]Đã lưu cookie YouTube Music. Search/play sẽ dùng browser auth kiểu Metrolist.[/green]")
+            except ValueError as e:
+                debug_log.exception("Classic ytmusic manual login failed", error=str(e))
+                console.print(f"[red]{e}[/red]")
+            return
+
+        if platform == "soundcloud":
+            token = extract_soundcloud_token(" ".join(parts[1:]))
+            if not token or token == "soundcloud":
+                console.print("[cyan]Đang thử lấy SoundCloud oauth_token từ Edge/Chrome/Brave/Firefox...[/cyan]")
+                try:
+                    account = self.accounts.login_soundcloud_browser_token()
+                    self.refresh_provider_auth("soundcloud")
+                    console.print(f"[green]Đã lấy SoundCloud token từ {account.get('browser', 'browser')}.[/green]")
+                except Exception as exc:
+                    console.print(f"[red]Không tự lấy được SoundCloud token: {exc}[/red]")
+                    console.print("[yellow]Dùng: login soundcloud <oauth_token>[/yellow]")
+                return
+            try:
+                self.accounts.login_soundcloud_token(token)
+                self.refresh_provider_auth("soundcloud")
+                console.print("[green]Đã lưu SoundCloud OAuth token.[/green]")
+            except ValueError as e:
+                console.print(f"[red]{e}[/red]")
+            return
+
         label = parts[1] if len(parts) > 1 else platform
         token = " ".join(parts[2:]) if len(parts) > 2 else ""
         try:
             self.accounts.login(platform, label, token)
+            self.refresh_provider_auth(platform)
             console.print(f"[green]Đã lưu đăng nhập local cho {platform}.[/green]")
             console.print("[dim]OAuth/API remote thật cần credential riêng của từng nền tảng; sync hiện tại lưu snapshot local an toàn.[/dim]")
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
+
+    def refresh_provider_auth(self, platform: str) -> None:
+        provider = self.providers.get(platform)
+        if hasattr(provider, "refresh_auth"):
+            provider.refresh_auth()
 
     def run(self):
         self.show_dashboard()
@@ -475,7 +562,7 @@ class SoundtifyApp:
                 args = parts[1] if len(parts) > 1 else ""
 
                 if cmd in ["quit", "exit", "q"]:
-                    self.player.stop()
+                    self.shutdown_audio()
                     console.print("[yellow]Tạm biệt![/yellow]")
                     sys.exit(0)
                 if cmd in ["now", "status", "home"]:
@@ -484,6 +571,7 @@ class SoundtifyApp:
                     self.show_help()
                 elif cmd == "stop":
                     self.player.stop()
+                    self.update_presence_for_current(playing=False)
                     console.print("[yellow]Đã dừng phát nhạc.[/yellow]")
                 elif cmd in ["next", "n"]:
                     self.next_track()
@@ -513,6 +601,7 @@ class SoundtifyApp:
                     self.handle_login_command(args)
                 elif cmd == "logout":
                     if self.accounts.logout(args):
+                        self.refresh_provider_auth(args)
                         console.print(f"[green]Đã đăng xuất {args}.[/green]")
                     else:
                         console.print("[yellow]Không tìm thấy tài khoản này.[/yellow]")
@@ -525,5 +614,5 @@ class SoundtifyApp:
             except KeyboardInterrupt:
                 continue
             except EOFError:
-                self.player.stop()
+                self.shutdown_audio()
                 break

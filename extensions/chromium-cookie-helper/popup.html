@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Soundtify Cookie Helper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Soundtify</h1>
+      <p>YouTube Music cookie helper</p>
+    </header>
+
+    <section id="status" class="status">Ready.</section>
+
+    <div class="actions">
+      <button id="copyCookie" type="button">Copy Cookie Header</button>
+      <button id="copySapisid" type="button" class="secondary">Copy SAPISID Only</button>
+      <button id="openYtmusic" type="button" class="secondary">Open YouTube Music</button>
+    </div>
+
+    <section class="details">
+      <div>
+        <span>Required</span>
+        <strong id="requiredState">Not checked</strong>
+      </div>
+      <div>
+        <span>Cookies found</span>
+        <strong id="cookieCount">0</strong>
+      </div>
+    </section>
+
+    <p class="hint">
+      This extension only reads YouTube/Google cookies when you press a button.
+      It copies them locally and does not send them anywhere.
+    </p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

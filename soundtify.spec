@@ -1,15 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 datas = collect_data_files('ytmusicapi')
+hiddenimports = []
+for optional_package in ('pypresence', 'winrt', 'winsdk'):
+    try:
+        hiddenimports += collect_submodules(optional_package)
+    except Exception:
+        pass
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
