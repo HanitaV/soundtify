@@ -17,7 +17,7 @@ Bạn có thể chạy dự án theo 2 cách:
 
 ### Cách 1: Sử dụng file chạy trực tiếp (Pre-compiled)
 Ứng dụng đã được đóng gói thành file `.exe` độc lập. Bạn không cần cài đặt Python hay bất kỳ phần mềm lập trình nào.
-1. Tìm file `soundtify.exe` trong thư mục `dist/`.
+1. Tải file `soundtify.exe` ở phần Release.
 2. Mở Terminal (PowerShell/CMD) và chạy file, hoặc đơn giản là nhấp đúp (Double-click) vào file.
 
 ### Cách 2: Chạy từ mã nguồn (Dành cho Developer)
